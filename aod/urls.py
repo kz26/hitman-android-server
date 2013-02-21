@@ -14,6 +14,6 @@ urlpatterns = patterns('',
 
     # Uncomment the next line to enable the admin:
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^login/$', 'aod.users.views.do_login', name='login'),
-    url(r'^update-location/$', 'aod.main.views.update_location', name='update_location'),
+    url(r'^users/', include('aod.users.urls')),
+    url(r'^game/', include('aod.game.urls')),
 )

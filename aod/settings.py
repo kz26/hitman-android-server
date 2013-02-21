@@ -123,7 +123,8 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'django.contrib.gis',
-    'aod.main', 'aod.users',
+    'rest_framework',
+    'aod.game', 'aod.users',
 )
 
 # A sample logging configuration. The only tangible logging
@@ -158,3 +159,7 @@ LOGGING = {
 AUTH_PROFILE_MODULE = "users.Profile"
 
 GCM_SENDER_ID = "791109992959"
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ('aod.users.gcm_auth.GCMAuthentication',)
+}
