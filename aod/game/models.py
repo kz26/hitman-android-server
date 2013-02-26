@@ -14,7 +14,7 @@ class Game(models.Model):
     name = models.CharField(max_length=255)
     start_time = models.DateTimeField()
     location = models.PointField()
-    players = models.ManyToManyField(User, related_name="+")
+    players = models.ManyToManyField(User, related_name="games", null=True, blank=True)
 
     objects = models.GeoManager()
 
@@ -47,7 +47,7 @@ class Kill(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
 class SensorRecord(models.Model):
-    timestamp = models.DateTimeField()
+    timestamp = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, related_name="+")
 
     class Meta:

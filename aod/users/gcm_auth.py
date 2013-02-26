@@ -3,7 +3,7 @@ from aod.users.models import *
 
 class GCMAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
-        gcmid = request.META.get('X_GCMID')
+        gcmid = request.META.get('HTTP_X_GCMID')
         if not gcmid:
             return None
 
@@ -11,3 +11,4 @@ class GCMAuthentication(authentication.BaseAuthentication):
             user = Profile.objects.get(gcm_regid=gcmid).user
         except Profile.DoesNotExist:
             raise authenticate.AuthenticationFailed("Invalid API key")
+        return (user, None)

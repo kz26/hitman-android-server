@@ -59,7 +59,7 @@ MEDIA_URL = ''
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/home/media/media.lawrence.com/static/"
-STATIC_ROOT = ''
+STATIC_ROOT = os.path.join(SITE_ROOT, 'static')
 
 # URL prefix for static files.
 # Example: "http://media.lawrence.com/static/"
@@ -123,6 +123,8 @@ INSTALLED_APPS = (
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'django.contrib.gis',
+    'south',
+    'djcelery',
     'rest_framework',
     'aod.game', 'aod.users',
 )
@@ -156,10 +158,22 @@ LOGGING = {
     }
 }
 
+# Authentication
 AUTH_PROFILE_MODULE = "users.Profile"
 
+# Google Cloud Messaging
 GCM_SENDER_ID = "791109992959"
 
+# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': ('aod.users.gcm_auth.GCMAuthentication',)
 }
+
+# Foursquare API keys
+FOURSQUARE_CLIENT_ID = "G0WP4F2T2UNM0W3XQK3WFJ3UU3KO5ZPWNUSDIKKMEYNI4H15"
+FOURSQUARE_CLIENT_SECRET = "HMK3KZRBD0RRGXQRYHGUB5YLDGUHB1PO35PI3HXCLCSCSL2T"
+
+# Django Celery
+import djcelery
+djcelery.setup_loader()
+BROKER_URL = 'amqp://guest:guest@localhost:5672//'

@@ -37,3 +37,6 @@ nosetests.xml
 
 # Node.js
 **node_modules**
+
+# Django
+**migrations**
