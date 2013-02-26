@@ -28,7 +28,7 @@ class CreateGame(generics.CreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     model = Game
     serializer_class = CreateGameSerializer
-    
+
 class ShowGame(generics.RetrieveAPIView):
     model = Game
     serializer_class = GameSerializer
@@ -54,11 +54,5 @@ class UpdateLocation(generics.CreateAPIView):
     authentication_classes = (GCMAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
 
-    def post(self, request, *args, **kwargs):
-        lr = LocationRecordSerializer(data=request.DATA)
-        if lr.is_valid():
-            lr = lr.save()
-            lr.user = request.user
-            return Response({'success': True})
-        else:
-            return Response({'success': False, 'reason': 'incorrect parameters'}, status=400)
+    def pre_save(self, obj):
+        obj.user = request.user
