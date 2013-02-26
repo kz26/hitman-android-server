@@ -28,6 +28,7 @@ class CreateGame(generics.CreateAPIView):
     serializer_class = CreateGameSerializer
     
 class ShowGame(generics.RetrieveAPIView):
+    model = Game
     serializer_class = GameSerializer
 
 class JoinGame(generics.UpdateAPIView):

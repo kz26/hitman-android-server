@@ -40,5 +40,5 @@ nosetests.xml
 
 # Django
 **migrations**
-static/admin/**
-static/rest_framework/**
+aod/static/admin/*
+aod/static/rest_framework/*
