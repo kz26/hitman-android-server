@@ -40,3 +40,5 @@ nosetests.xml
 
 # Django
 **migrations**
+static/admin/**
+static/rest_framework/**
