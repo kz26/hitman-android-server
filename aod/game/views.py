@@ -8,6 +8,7 @@ from aod.game.serializers import *
 from aod.users.gcm_auth import *
 
 class GameList(generics.ListAPIView):
+    model = Game
     serializer_class = GameSerializer
 
     def get_queryset(self):
@@ -25,6 +26,7 @@ class GameList(generics.ListAPIView):
 class CreateGame(generics.CreateAPIView):
     authentication_classes = (GCMAuthentication,)
     permission_classes = (permissions.IsAuthenticated,)
+    model = Game
     serializer_class = CreateGameSerializer
     
 class ShowGame(generics.RetrieveAPIView):
