@@ -10,11 +10,19 @@ class LatLongField(serializers.WritableField):
     def from_native(self, value):
         return "POINT(%s %s)" % tuple(value.split(","))
 
+class PlayersField(serializers.Field):
+    read_only = True
+    def to_native(self, obj):
+        plist = []
+        for p in obj.players.all():
+            plist.append({'id': p.id, 'username': p.username})
+        return plist
+
 class GameSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
 
-    players = serializers.SerializerMethodField('get_players')
+    players = PlayersField(source="*")
     location = LatLongField()
 
     def get_players(self, obj):
@@ -26,9 +34,10 @@ class GameSerializer(serializers.ModelSerializer):
 class CreateGameSerializer(serializers.ModelSerializer):
     class Meta:
         model = Game
-        fields = ('id', 'name', 'start_time', 'location')
+        fields = ('id', 'name', 'start_time', 'location', 'players')
 
     location = LatLongField()
+    players = PlayersField(source="*")
 
 class LocationRecordSerializer(serializers.ModelSerializer):
     class Meta:

@@ -42,7 +42,8 @@ class JoinGame(generics.UpdateAPIView):
         if request.user.games.exists():
             return Response({'success': False, 'reason': 'User is already part of a game'}, status=403)
         else:
-            self.object.players.add(request.user)             
+            game = self.get_object()
+            game.players.add(request.user)             
             return Response({'success': True})
 
     def put(self, request, *args, **kwargs):

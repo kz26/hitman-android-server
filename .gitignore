@@ -42,3 +42,6 @@ nosetests.xml
 **migrations**
 aod/static/admin/*
 aod/static/rest_framework/*
+
+# Misc
+.*.swp

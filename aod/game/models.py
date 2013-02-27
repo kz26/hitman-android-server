@@ -18,6 +18,9 @@ class Game(models.Model):
 
     objects = models.GeoManager()
 
+    def __unicode__(self):
+        return "%s: %s" % (self.id, self.name)
+
 class Contract(models.Model):
     game = models.ForeignKey(Game)
     assassin = models.ForeignKey(User, related_name="+")
