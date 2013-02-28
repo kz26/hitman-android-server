@@ -43,4 +43,5 @@ class LocationRecordSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocationRecord
         fields = ('location',)
+    location = LatLongField()
 
