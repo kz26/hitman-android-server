@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from geopy.distance import distance
 from geopy.point import Point
 import uuid
-from gcm import GCM
+from aod.game import fsqfuncs
 
 # Create your models here.
 
@@ -22,7 +22,7 @@ class Game(models.Model):
         return "%s: %s" % (self.id, self.name)
 
 class Contract(models.Model):
-    game = models.ForeignKey(Game)
+    game = models.ForeignKey(Game, related_name="contracts")
     assassin = models.ForeignKey(User, related_name="+")
     target = models.ForeignKey(User, related_name="+")
 
@@ -50,14 +50,35 @@ class Kill(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
 
 class SensorRecord(models.Model):
+    class Meta:
+        ordering = ['-timestamp']
     timestamp = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(User, related_name="+")
 
     class Meta:
         abstract = True
 
+class LocationManager(models.Manager):
+    def gen_user_location(self, user):
+        userLocs = self.filter(user=user)[:5]
+        if not userLocs.exists():
+            return None
+        mostRecentLoc = userLocs[0]
+        isMoving = False
+        for o in userLocs.objects.distance(mostRecentLoc.location):
+            if o.distance.m > 500:
+                isMoving = True
+                break
+        name = foursquare.get_nearest_location(mostRecentLoc.location.x, mostRecentLoc.location.y)
+        return {'type': 'location', 'message': "%s is near %s" % (user.username, name)}
+
 class LocationRecord(SensorRecord):
     location = models.PointField()
+
+    objects = LocationManager()
+
+    def __unicode__(self):
+        return "%s, %s, %s,%s" % (self.user, self.timestamp, self.location.x, self.location.y)
 
 class PhotoSetRecord(SensorRecord):
     contract = models.ForeignKey(Contract)
@@ -72,16 +93,7 @@ class Photo(models.Model):
     photoset = models.ForeignKey(PhotoSetRecord)
     photo = models.FileField(upload_to=gen_filename)
 
-    #def get_proximity(self):
-    #    return distance(
-    #        Point(*self.assassin_location.coords),
-    #        Point(*self.target_location.coords)
-    #    ).meters
-
-# Signal handling
-
-gcm = GCM(settings.GCM_SENDER_ID)
-
+NOTIFICATION_PROVIDERS = [LocationRecord.objects.gen_user_location]
 
 #@receiver(post_save, sender=Contract, dispatch_uid="contract_post_save_gcm")
 #def gcm_update(sender, **kwargs):

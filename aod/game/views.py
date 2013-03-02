@@ -56,4 +56,4 @@ class UpdateLocation(generics.CreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def pre_save(self, obj):
-        obj.user = request.user
+        obj.user = self.request.user
