@@ -162,7 +162,7 @@ LOGGING = {
 AUTH_PROFILE_MODULE = "users.Profile"
 
 # Google Cloud Messaging
-GCM_SENDER_ID = "791109992959"
+GCM_API_KEY = "AIzaSyCPNIYRpSsTWPi296XdY7ztouA1DMwMFc0"
 
 # REST Framework
 REST_FRAMEWORK = {

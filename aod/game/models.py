@@ -3,6 +3,7 @@ from django.contrib.gis.db import models
 from django.db.models.signals import *
 from django.dispatch import receiver
 from django.contrib.auth.models import User
+from django.contrib.gis.measure import D
 from geopy.distance import distance
 from geopy.point import Point
 import uuid
@@ -65,12 +66,10 @@ class LocationManager(models.Manager):
             return None
         mostRecentLoc = userLocs[0]
         isMoving = False
-        for o in userLocs.objects.distance(mostRecentLoc.location):
-            if o.distance.m > 500:
-                isMoving = True
-                break
-        name = foursquare.get_nearest_location(mostRecentLoc.location.x, mostRecentLoc.location.y)
-        return {'type': 'location', 'message': "%s is near %s" % (user.username, name)}
+        #if userLocs.filter(location__dwithin=(mostRecentLoc.location, D(m=500))).count() == userLocs.count():
+        #    isMoving = True
+        name = fsqfuncs.get_nearest_location(mostRecentLoc.location.x, mostRecentLoc.location.y)
+        return {'type': 'location_stationary', 'target': user.username, 'location': location}
 
 class LocationRecord(SensorRecord):
     location = models.PointField()
