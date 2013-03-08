@@ -6,6 +6,7 @@ from rest_framework import permissions
 from aod.game.models import *
 from aod.game.serializers import *
 from aod.users.gcm_auth import *
+from aod.game import tasks
 
 class GameList(generics.ListAPIView):
     model = Game

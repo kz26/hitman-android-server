@@ -19,6 +19,8 @@ class Command(BaseCommand):
                         continue
                     for provider in NOTIFICATION_PROVIDERS:
                         result = provider(contract.target)
+                        if result is None:
+                            continue
                         if contract.target.username not in last_update:
                             last_update[contract.target.username] = None 
                         if not last_update[contract.target.username] or timezone.now() >= last_update[contract.target.username] + timedelta(seconds=target_profile.update_frequency):

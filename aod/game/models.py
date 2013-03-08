@@ -4,10 +4,10 @@ from django.db.models.signals import *
 from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.contrib.gis.measure import D
-from geopy.distance import distance
-from geopy.point import Point
 import uuid
 from aod.game import fsqfuncs
+from aod.game import gisfuncs
+from aod.game import tasks
 
 # Create your models here.
 
@@ -15,12 +15,17 @@ class Game(models.Model):
     name = models.CharField(max_length=255)
     start_time = models.DateTimeField()
     location = models.PointField()
-    players = models.ManyToManyField(User, related_name="games", null=True, blank=True)
+    players = models.ManyToManyField(User, related_name="players", null=True, blank=True)
 
     objects = models.GeoManager()
 
     def __unicode__(self):
         return "%s: %s" % (self.id, self.name)
+
+@receiver(post_save, sender=Game, dispatch_uid="game start signal")
+def game_start_handler(sender, **kwargs):
+    game = kwargs['instance']
+    tasks.assign_targets.apply_async([game.id], eta=game.start_time)
 
 class Contract(models.Model):
     game = models.ForeignKey(Game, related_name="contracts")
@@ -54,6 +59,7 @@ class SensorRecord(models.Model):
     class Meta:
         ordering = ['-timestamp']
     timestamp = models.DateTimeField(auto_now_add=True)
+    game = models.ForeignKey(Game, related_name="+")
     user = models.ForeignKey(User, related_name="+")
 
     class Meta:
@@ -61,15 +67,24 @@ class SensorRecord(models.Model):
 
 class LocationManager(models.Manager):
     def gen_user_location(self, user):
-        userLocs = self.filter(user=user)[:5]
-        if not userLocs.exists():
+        userLocs = list(self.filter(user=user).order_by("-timestamp")[:5])
+        if not userLocs:
             return None
         mostRecentLoc = userLocs[0]
         isMoving = False
-        #if userLocs.filter(location__dwithin=(mostRecentLoc.location, D(m=500))).count() == userLocs.count():
-        #    isMoving = True
-        name = fsqfuncs.get_nearest_location(mostRecentLoc.location.x, mostRecentLoc.location.y)
-        return {'type': 'location_stationary', 'target': user.username, 'location': location}
+        if gisfuncs.multi_distance(userLocs) >= 250:
+            isMoving = True
+            oldestLoc = userLocs[-1]
+            nameFrom = fsqfuncs.get_nearest_location(oldestLoc.location)
+            nameTo = fsqfuncs.get_nearest_location(mostRecentLoc.location)
+            if nameFrom and nameTo:
+                return {'type': 'location_moving', 'target': user.username, 'locationFrom': nameFrom, 'locationTo': nameTo}
+            return None
+        else:
+            name = fsqfuncs.get_nearest_location(mostRecentLoc.location)
+            if name:
+                return {'type': 'location_stationary', 'target': user.username, 'location': name}
+            return None
 
 class LocationRecord(SensorRecord):
     location = models.PointField()

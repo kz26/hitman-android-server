@@ -5,10 +5,10 @@ from rest_framework import serializers
 
 class LatLongField(serializers.WritableField):
     def to_native(self, value):
-        return "%s,%s" % (value.x, value.y)
+        return "%s,%s" % (value.y, value.x)
 
     def from_native(self, value):
-        return "POINT(%s %s)" % tuple(value.split(","))
+        return "POINT(%s %s)" % tuple(reversed(value.split(",")))
 
 class PlayersField(serializers.Field):
     read_only = True
