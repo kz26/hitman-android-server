@@ -8,24 +8,20 @@ import uuid
 from aod.game import fsqfuncs
 from aod.game import gisfuncs
 from aod.game import tasks
+from aod.game import validators
 
 # Create your models here.
 
 class Game(models.Model):
     name = models.CharField(max_length=255)
-    start_time = models.DateTimeField()
+    start_time = models.DateTimeField(validators=[validators.FutureDateValidator])
     location = models.PointField()
-    players = models.ManyToManyField(User, related_name="players", null=True, blank=True)
+    players = models.ManyToManyField(User, related_name="games", null=True, blank=True)
 
     objects = models.GeoManager()
 
     def __unicode__(self):
         return "%s: %s" % (self.id, self.name)
-
-@receiver(post_save, sender=Game, dispatch_uid="game start signal")
-def game_start_handler(sender, **kwargs):
-    game = kwargs['instance']
-    tasks.assign_targets.apply_async([game.id], eta=game.start_time)
 
 class Contract(models.Model):
     game = models.ForeignKey(Game, related_name="contracts")
