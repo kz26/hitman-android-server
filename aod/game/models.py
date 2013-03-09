@@ -62,24 +62,25 @@ class SensorRecord(models.Model):
         abstract = True
 
 class LocationManager(models.Manager):
-    def gen_user_location(self, user):
-        userLocs = list(self.filter(user=user).order_by("-timestamp")[:5])
+    def gen_user_location(self, contract):
+        userLocs = list(self.filter(user=contract.target).order_by("-timestamp")[:5])
         if not userLocs:
             return None
         mostRecentLoc = userLocs[0]
         isMoving = False
+        gcmid = contract.target.get_profile().gcm_regid
         if gisfuncs.multi_distance(userLocs) >= 250:
             isMoving = True
             oldestLoc = userLocs[-1]
             nameFrom = fsqfuncs.get_nearest_location(oldestLoc.location)
             nameTo = fsqfuncs.get_nearest_location(mostRecentLoc.location)
             if nameFrom and nameTo:
-                return {'type': 'location_moving', 'target': user.username, 'locationFrom': nameFrom, 'locationTo': nameTo}
+                return [(gcmid, {'type': 'location_moving', 'target': contract.target.username, 'locationFrom': nameFrom, 'locationTo': nameTo})]
             return None
         else:
             name = fsqfuncs.get_nearest_location(mostRecentLoc.location)
             if name:
-                return {'type': 'location_stationary', 'target': user.username, 'location': name}
+                return [(gcmid, {'type': 'location_stationary', 'target': contract.target.username, 'location': name})]
             return None
 
 class LocationRecord(SensorRecord):
@@ -90,8 +91,30 @@ class LocationRecord(SensorRecord):
     def __unicode__(self):
         return "%s, %s, %s,%s" % (self.user, self.timestamp, self.location.x, self.location.y)
 
+class PhotoSetManager(models.Manager):
+    def gen_photosets(self, contract):
+        targetLocs = LocationRecord.objects.filter(game=contract.game, user=contract.target).order_by("-timestamp") 
+        if not targetLocs.exists():
+            return None
+        for player in contract.game.players.all().order_by("?"):
+            if player == contract.assassin or player == contract.target:
+                continue
+            takerLocs = LocationRecord.objects.filter(game=contract.game, user=player).order_by("-timestamp")
+            if not takerLocs.exists():
+                continue
+            if gisfuncs.multi_distance([takerLocs[0], targetLocs[0]]) > 50:
+                continue
+            ps = self.filter(contract=contract, user=player)
+            if ps.exists():
+                return [(player.get_profile().gcm_regid, {'type': 'take_photo', 'photoset': ps[0].id})]
+            else:
+                ps = self.create(game=contract.game, contract=contract, user=player)
+                return [(player.get_profile().gcm_regid, {'type': 'take_photo', 'photoset': ps.id})]
+
 class PhotoSetRecord(SensorRecord):
     contract = models.ForeignKey(Contract)
+
+    objects = PhotoSetManager()
 
 def gen_filename(instance, filename):
     fn = "%s.%s/" % (instance.content_type.app_label, instance.content_type.model)
@@ -103,21 +126,5 @@ class Photo(models.Model):
     photoset = models.ForeignKey(PhotoSetRecord)
     photo = models.FileField(upload_to=gen_filename)
 
-NOTIFICATION_PROVIDERS = [LocationRecord.objects.gen_user_location]
+NOTIFICATION_PROVIDERS = [LocationRecord.objects.gen_user_location, PhotoSetRecord.objects.gen_photosets]
 
-#@receiver(post_save, sender=Contract, dispatch_uid="contract_post_save_gcm")
-#def gcm_update(sender, **kwargs):
-#    contract = kwargs['instance']
-#    assassin_gcmid = contract.assassin.get_profile().gcm_regid
-#    target_gcmid = contract.target.get_profile().gcm_regid
-#    data = {
-#        'assassin': {
-#            'x': contract.assassin_location.x,
-#            'y': contract.assassin_location.y
-#        },
-#        'target': {
-#            'x': contract.target_location.x,
-#            'y': contract.target_location.y
-#        }
-#    }
-#    gcm.json_request(registration_ids=[assassin_gcmid, target_gcmid], data=data)

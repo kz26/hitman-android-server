@@ -7,7 +7,8 @@ urlpatterns = patterns('',
     url(r'^create/$', CreateGame.as_view(), name='CreateGame'),
     url(r'^(?P<pk>[0-9]+)/$', ShowGame.as_view(), name='ShowGame'),
     url(r'^(?P<pk>[0-9]+)/join/$', JoinGame.as_view(), name='JoinGame'),
-    url(r'^(?P<pk>[0-9]+)/sensors/location/update/$', UpdateLocation.as_view(), name='UpdateLocation'),
+    url(r'^sensors/location/create/$', CreateLocation.as_view(), name='CreateLocation'),
+    url(r'^sensors/camera/upload/$', PhotoUpload.as_view(), name='PhotoUpload'),
 )
 
 urlpatterns = format_suffix_patterns(urlpatterns)

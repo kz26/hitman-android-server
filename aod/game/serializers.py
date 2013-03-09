@@ -45,3 +45,7 @@ class LocationRecordSerializer(serializers.ModelSerializer):
         fields = ('location',)
     location = LatLongField()
 
+class PhotoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Photo
+        fields = ('photoset', 'photo')

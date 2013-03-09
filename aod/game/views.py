@@ -54,15 +54,13 @@ class JoinGame(generics.UpdateAPIView):
         else:
             game = self.get_object()
             game.players.add(request.user)             
+            tasks.notify_join.delay(game.id, self.request.user.username)
             return Response({'success': True})
 
     def put(self, request, *args, **kwargs):
         return self.patch(request, *args, **kwargs)
 
-    def post_save(self, game, created):
-        tasks.notify_join.delay(game.id, self.request.user.username)
-
-class UpdateLocation(generics.CreateAPIView):
+class CreateLocation(generics.CreateAPIView):
     model = LocationRecord
     serializer_class = LocationRecordSerializer
     authentication_classes = (GCMAuthentication,)
@@ -74,8 +72,30 @@ class UpdateLocation(generics.CreateAPIView):
             return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
         else:
             self.user_game = user_games[0]
-        return super(UpdateLocation, self).post(request, *args, **kwargs)
+        return super(CreateLocation, self).post(request, *args, **kwargs)
 
     def pre_save(self, obj):
         obj.user = self.request.user
         obj.game = self.user_game
+
+class PhotoUpload(generics.CreateAPIView):
+    model = Photo
+    serializer_class = PhotoSerializer
+    authentication_classes = (GCMAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request, *args, **kwargs):
+        user_games = request.user.games.all()
+        if not user_games.count():
+            return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
+        else:
+            self.user_game = user_games[0]
+        return super(PhotoUpload, self).post(request, *args, **kwargs)
+
+    def pre_save(self, obj):
+        obj.user = self.request.user
+        obj.game = self.user_game
+
+    def post_save(self, obj, created):
+        if created:
+            tasks.notify_photo.delay(obj.id)

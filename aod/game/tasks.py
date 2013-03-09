@@ -51,6 +51,16 @@ def notify_join(gameid, newPlayer): # newplayer is a username
     for player in game.players.all():
         if player.username != newPlayer:
             gcmid = player.get_profile().gcm_regid
-            data = {'type': 'player_join', 'name': player.username}
+            data = {'type': 'player_join', 'name': newPlayer}
             print "[%s] (%s) %s" % (timezone.now(), player.username, data)
             gcm.json_request(registration_ids=[gcmid], data=data)
+
+@task
+def notify_photo(photoid):
+    from aod.game.models import Photo
+    photo = Photo.objects.get(id=photoid)
+    contract = photo.photoset.contract
+    assassin_gcmid = contract.assassin.get_profile().gcm_regid
+    data = {'type': 'photo_received', 'target': contract.target.username, 'url': photo.photo.url}
+    print "[%s] (%s) %s" % (timezone.now(), contract.assassin.username, data)
+    gcm.json_request(registration_ids=[assassin_gcmid], data=data)
