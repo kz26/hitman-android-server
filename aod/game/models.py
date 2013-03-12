@@ -5,6 +5,8 @@ from django.dispatch import receiver
 from django.contrib.auth.models import User
 from django.contrib.gis.measure import D
 import uuid
+import os
+from datetime import date
 from aod.game import fsqfuncs
 from aod.game import gisfuncs
 from aod.game import tasks
@@ -18,10 +20,28 @@ class Game(models.Model):
     location = models.PointField()
     players = models.ManyToManyField(User, related_name="games", null=True, blank=True)
 
-    objects = models.GeoManager()
-
     def __unicode__(self):
         return "%s: %s" % (self.id, self.name)
+
+    def has_ended(self):
+        return self.contracts.all().count() <= 1
+
+    def save(self, *args, **kwargs):
+        firstSave = False
+        if not self.id:
+            firstSave = True
+        super(Game, self).save(*args, **kwargs)
+        if firstSave:
+            tasks.assign_targets.apply_async([self.id], eta=self.start_time)
+
+@receiver(m2m_changed, sender=Game.players.through, dispatch_uid="game join notification")
+def game_join_notify(sender, **kwargs):
+    if kwargs['action'] == "pre_add" and kwargs['reverse'] == False:
+        game = kwargs['instance']
+        new_players = [User.objects.get(pk=x) for x in kwargs['pk_set']]
+        for player in new_players:
+            player.get_profile().refresh_kill_code()
+            tasks.notify_join.delay(game.id, player.username)
 
 class Contract(models.Model):
     game = models.ForeignKey(Game, related_name="contracts")
@@ -32,24 +52,54 @@ class Contract(models.Model):
         return "Assassin: %s, Target: %s" % (self.assassin.username, self.target.username)
 
     def assassin_win(self): # call when assassin kills target
-        Kill.objects.create(game=self, killer=self.assassin, victim=self.target) # create kill record
         target_contract = Contract.objects.get(assassin=self.target) # retrieve victim's contract
         self.target = target_contract.target # and update with new target
         self.save()
         target_contract.delete() # delete the deceased's contract
+        return self
 
     def target_win(self): # call when target kills assassin
-        Kill.objects.create(game=self, killer=self.target, victim=self.assassin) # create kill record
-        assassin_contract = Contract.objects.get(target=self.assassin)
-        self.assassin = assassin_contract.assassin
-        self.save()
-        assassin_contract.delete()
+        assassin_contract = Contract.objects.get(target=self.assassin) # retrieve contract of person assigned to kill assassin
+        assassin_contract.target = self.target # update target to the person who killed the assassin
+        assassin_contract.save()
+        self.delete()
+        return assassin_contract 
+
+class KillManager(models.Manager):
+    def process_kill(self, user, kill_code):
+        contracts = Contract.objects.filter(assassin=user, target__profile__kill_code=kill_code)
+        if contracts.exists() and user != contracts[0].target:
+            killer = contracts[0].assassin
+            victim = contracts[0].target
+            toRun = contracts[0].assassin_win
+        else:
+            contracts = Contract.objects.filter(target=user, assassin__profile__kill_code=kill_code)
+            if contracts.exists() and user != contracts[0].assassin:
+                killer = contracts[0].target
+                victim = contracts[0].assassin
+                toRun = contracts[0].target_win
+            else:
+                return False
+        killRecord = self.create(game=contracts[0].game, killer=killer, victim=victim)
+        new_contract = toRun()
+        tasks.notify_killed.delay(killRecord.victim)
+        if killRecord.game.has_ended():
+            tasks.end_game.delay(killRecord.game.id) 
+        else:
+            tasks.notify_new_target.delay(new_contract.id)
+        return True
+
 
 class Kill(models.Model):
     game = models.ForeignKey(Game)
     killer = models.ForeignKey(User, related_name="+")
     victim = models.ForeignKey(User, related_name="+")
     timestamp = models.DateTimeField(auto_now_add=True)
+
+    objects = KillManager()
+
+    def __unicode__(self):
+        return "%s killed %s" % (self.killer, self.victim)
 
 class SensorRecord(models.Model):
     class Meta:
@@ -68,7 +118,7 @@ class LocationManager(models.Manager):
             return None
         mostRecentLoc = userLocs[0]
         isMoving = False
-        gcmid = contract.target.get_profile().gcm_regid
+        gcmid = contract.assassin.get_profile().gcm_regid
         if gisfuncs.multi_distance(userLocs) >= 250:
             isMoving = True
             oldestLoc = userLocs[-1]
@@ -117,9 +167,8 @@ class PhotoSetRecord(SensorRecord):
     objects = PhotoSetManager()
 
 def gen_filename(instance, filename):
-    fn = "%s.%s/" % (instance.content_type.app_label, instance.content_type.model)
-    fn += date.today().strftime("%Y/%m/%d/")
-    fn += str(uuid1()) + splitext(filename)[1].lower()
+    fn = date.today().strftime("%Y/%m/%d/")
+    fn += str(uuid.uuid1()) + os.path.splitext(filename)[1].lower()
     return fn
 
 class Photo(models.Model):

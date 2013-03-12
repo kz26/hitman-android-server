@@ -49,3 +49,4 @@ class PhotoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Photo
         fields = ('photoset', 'photo')
+

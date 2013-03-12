@@ -9,6 +9,7 @@ urlpatterns = patterns('',
     url(r'^(?P<pk>[0-9]+)/join/$', JoinGame.as_view(), name='JoinGame'),
     url(r'^sensors/location/create/$', CreateLocation.as_view(), name='CreateLocation'),
     url(r'^sensors/camera/upload/$', PhotoUpload.as_view(), name='PhotoUpload'),
+    url(r'^kill/$', DoKill.as_view(), name='DoKill'),
 )
 
 urlpatterns = format_suffix_patterns(urlpatterns)

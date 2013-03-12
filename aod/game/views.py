@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework.response import Response
 from rest_framework import generics
 from rest_framework import permissions
+from rest_framework import views
 from aod.game.models import *
 from aod.game.serializers import *
 from aod.users.gcm_auth import *
@@ -35,10 +36,6 @@ class CreateGame(generics.CreateAPIView):
     model = Game
     serializer_class = CreateGameSerializer
 
-    def post_save(self, game, created):
-        if created:
-            tasks.assign_targets.apply_async([game.id], eta=game.start_time)
-
 class ShowGame(generics.RetrieveAPIView):
     model = Game
     serializer_class = GameSerializer
@@ -54,7 +51,6 @@ class JoinGame(generics.UpdateAPIView):
         else:
             game = self.get_object()
             game.players.add(request.user)             
-            tasks.notify_join.delay(game.id, self.request.user.username)
             return Response({'success': True})
 
     def put(self, request, *args, **kwargs):
@@ -99,3 +95,23 @@ class PhotoUpload(generics.CreateAPIView):
     def post_save(self, obj, created):
         if created:
             tasks.notify_photo.delay(obj.id)
+
+class DoKill(views.APIView):
+    authentication_classes = (GCMAuthentication,)
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        user_games = request.user.games.all()
+        if not user_games.count():
+            return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
+        else:
+            self.user_game = user_games[0]
+        if 'kill_code' in request.DATA:
+            result = Kill.objects.process_kill(request.user, request.DATA['kill_code'])
+            if result:
+                return Response({'success': True})
+            else:
+                return Response({'success': False, 'reason': 'Invalid kill code'}, status=403)
+        else:
+            return Response({'success': False, 'reason': 'kill_code not provided'}, status=400)
+
