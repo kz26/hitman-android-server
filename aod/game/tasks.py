@@ -75,21 +75,20 @@ def notify_new_target(contractId):
     gcm.json_request(registration_ids=[assassin_gcmid], data=data)
 
 @task
-def notify_killed(user):
+def notify_killed(game, user):
     profile = user.get_profile()
-    data = {'type': 'killed'}
-    print "[%s] (%s) %s" % (timezone.now(), profile.gcm_regid, data)
-    gcm.json_request(registration_ids=[profile.gcm_regid], data=data)
+    data = {'type': 'killed', 'victim': user.username}
+    for player in game.players.all():
+        print "[%s] (%s) %s" % (timezone.now(), profile.gcm_regid, data)
+        gcm.json_request(registration_ids=[player.get_profile().gcm_regid], data=data)
 
 @task
 def end_game(gameId):
     from aod.game.models import Game
     game = Game.objects.get(id=gameId)
-    if game.has_ended():
-        gcm_ids = []
-        for player in game.players.all():
-            gcm_ids.append(player.get_profile().gcm_regid)
-        data = {'type': 'game_end', 'winner': game.contracts.all()[0].assassin.username}
-        print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
-        gcm.json_request(registration_ids=gcm_ids, data=data)
+    for player in game.players.all():
+        gcm_ids.append(player.get_profile().gcm_regid)
+    data = {'type': 'game_end', 'winner': game.contracts.all()[0].assassin.username}
+    print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
+    gcm.json_request(registration_ids=gcm_ids, data=data)
 
