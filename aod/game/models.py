@@ -11,6 +11,7 @@ from aod.game import fsqfuncs
 from aod.game import gisfuncs
 from aod.game import tasks
 from aod.game import validators
+from aod.game.imageResize import enlarge 
 
 # Create your models here.
 
@@ -174,6 +175,10 @@ def gen_filename(instance, filename):
 class Photo(models.Model):
     photoset = models.ForeignKey(PhotoSetRecord)
     photo = models.FileField(upload_to=gen_filename)
+
+@receiver(post_save, sender=Photo, dispatch_uid="enlarge photo")
+def enlarge_photo(sender, **kwargs):
+    enlarge(kwargs['instance'].photo.path) 
 
 NOTIFICATION_PROVIDERS = [LocationRecord.objects.gen_user_location, PhotoSetRecord.objects.gen_photosets]
 
