@@ -45,3 +45,4 @@ aod/static/rest_framework/*
 
 # Misc
 .*.swp
+aod/media/*
