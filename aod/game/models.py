@@ -10,14 +10,13 @@ from datetime import date
 from aod.game import fsqfuncs
 from aod.game import gisfuncs
 from aod.game import tasks
-from aod.game import validators
 from aod.game.imageResize import enlarge 
 
 # Create your models here.
 
 class Game(models.Model):
     name = models.CharField(max_length=255)
-    start_time = models.DateTimeField(validators=[validators.FutureDateValidator])
+    start_time = models.DateTimeField()
     location = models.PointField()
     players = models.ManyToManyField(User, related_name="games", null=True, blank=True)
 
@@ -25,7 +24,7 @@ class Game(models.Model):
         return "%s: %s" % (self.id, self.name)
 
     def has_ended(self):
-        return self.contracts.all().count() <= 1
+        return self.players.all().count() <= 1
 
     def save(self, *args, **kwargs):
         firstSave = False
@@ -33,7 +32,7 @@ class Game(models.Model):
             firstSave = True
         super(Game, self).save(*args, **kwargs)
         if firstSave:
-            tasks.assign_targets.apply_async([self.id], eta=self.start_time)
+            tasks.assign_targets.apply_async([self], eta=self.start_time)
 
 @receiver(m2m_changed, sender=Game.players.through, dispatch_uid="game join notification")
 def game_join_notify(sender, **kwargs):
@@ -42,7 +41,7 @@ def game_join_notify(sender, **kwargs):
         new_players = [User.objects.get(pk=x) for x in kwargs['pk_set']]
         for player in new_players:
             player.get_profile().refresh_kill_code()
-            tasks.notify_join.delay(game.id, player.username)
+            tasks.notify_join.delay(game, player.username)
 
 class Contract(models.Model):
     game = models.ForeignKey(Game, related_name="contracts")
@@ -83,16 +82,15 @@ class KillManager(models.Manager):
                 return False
         killRecord = self.create(game=contracts[0].game, killer=killer, victim=victim)
         new_contract = toRun()
-        tasks.notify_killed.delay(killRecord.victim)
-        if killRecord.game.has_ended():
-            tasks.end_game.delay(killRecord.game.id) 
-        else:
-            tasks.notify_new_target.delay(new_contract.id)
+        tasks.notify_killed.delay(killRecord)
+        tasks.notify_new_target.apply_async([new_contract], countdown=30)
         return True
 
 
 class Kill(models.Model):
-    game = models.ForeignKey(Game)
+    class Meta:
+        ordering = ['-timestamp']
+    game = models.ForeignKey(Game, related_name="kills")
     killer = models.ForeignKey(User, related_name="+")
     victim = models.ForeignKey(User, related_name="+")
     timestamp = models.DateTimeField(auto_now_add=True)
@@ -100,7 +98,7 @@ class Kill(models.Model):
     objects = KillManager()
 
     def __unicode__(self):
-        return "%s killed %s" % (self.killer, self.victim)
+        return "(Game %s) %s killed %s" % (self.game.id, self.killer, self.victim)
 
 class SensorRecord(models.Model):
     class Meta:

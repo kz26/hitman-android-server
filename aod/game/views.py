@@ -10,6 +10,7 @@ from aod.game.models import *
 from aod.game.serializers import *
 from aod.users.gcm_auth import *
 from aod.game import tasks
+from aod.users import permissions as userPermissions
 from gcm import GCM
 
 gcm = GCM(settings.GCM_API_KEY) 
@@ -51,7 +52,7 @@ class JoinGame(generics.UpdateAPIView):
         else:
             game = self.get_object()
             game.players.add(request.user)             
-            return Response({'success': True})
+            return Response({'success': True, 'num_players': game.players.all().count()})
 
     def put(self, request, *args, **kwargs):
         return self.patch(request, *args, **kwargs)
@@ -60,37 +61,21 @@ class CreateLocation(generics.CreateAPIView):
     model = LocationRecord
     serializer_class = LocationRecordSerializer
     authentication_classes = (GCMAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        user_games = request.user.games.all()
-        if not user_games.count():
-            return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
-        else:
-            self.user_game = user_games[0]
-        return super(CreateLocation, self).post(request, *args, **kwargs)
+    permission_classes = (permissions.IsAuthenticated, userPermissions.IsInGame)
 
     def pre_save(self, obj):
         obj.user = self.request.user
-        obj.game = self.user_game
+        obj.game = self.request.user.games.all()[0]
 
 class PhotoUpload(generics.CreateAPIView):
     model = Photo
     serializer_class = PhotoSerializer
     authentication_classes = (GCMAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
-
-    def post(self, request, *args, **kwargs):
-        user_games = request.user.games.all()
-        if not user_games.count():
-            return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
-        else:
-            self.user_game = user_games[0]
-        return super(PhotoUpload, self).post(request, *args, **kwargs)
+    permission_classes = (permissions.IsAuthenticated, userPermissions.IsInGame)
 
     def pre_save(self, obj):
         obj.user = self.request.user
-        obj.game = self.user_game
+        obj.game = self.request.user.games.all()[0]
 
     def post_save(self, obj, created):
         if created:
@@ -98,14 +83,9 @@ class PhotoUpload(generics.CreateAPIView):
 
 class DoKill(views.APIView):
     authentication_classes = (GCMAuthentication,)
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, userPermissions.IsInGame)
 
     def post(self, request):
-        user_games = request.user.games.all()
-        if not user_games.count():
-            return Response({'success': False, 'reason': 'User is not joined to a game'}, status=403)
-        else:
-            self.user_game = user_games[0]
         if 'kill_code' in request.DATA:
             result = Kill.objects.process_kill(request.user, request.DATA['kill_code'])
             if result:

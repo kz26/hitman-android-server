@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.gis.geos import *
 from aod.game.models import *
+from aod.game import validators
 from rest_framework import serializers
 
 class LatLongField(serializers.WritableField):
@@ -37,6 +38,7 @@ class CreateGameSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'start_time', 'location', 'players')
 
     location = LatLongField()
+    start_time = serializers.DateTimeField(validators=[validators.FutureDateValidator])
     players = PlayersField(source="*")
 
 class LocationRecordSerializer(serializers.ModelSerializer):

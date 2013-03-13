@@ -7,9 +7,7 @@ from django.utils import timezone
 gcm = GCM(settings.GCM_API_KEY)
 
 @task
-def assign_targets(gameid):
-    from aod.game.models import Game, Contract
-    game = Game.objects.get(id=gameid)
+def assign_targets(game):
     playerCount = game.players.all().count()
     if playerCount >= 2:
         print "Game %s: Assigning contracts for %s players" % (game.id, playerCount)
@@ -21,7 +19,7 @@ def assign_targets(gameid):
             assassin = players[index]
             Contract.objects.create(game=game, assassin=assassin, target=target)
 
-        start_game.delay(gameid)
+        start_game.delay(game)
 
     else:
         print "Game %s: not enough players - deleting" % (game.id)
@@ -31,27 +29,22 @@ def assign_targets(gameid):
         game.delete()
 
 @task
-def start_game(gameid):
-    from aod.game.models import Game, Contract
-    #from aod.game.serializers import GameSerializer
-    game = Game.objects.get(id=gameid)
+def start_game(game):
     print "Game %s: starting" % (game.id)
     for player in game.players.all():
         player_profile = player.get_profile()
-        contract = Contract.objects.get(game=game, assassin=player)
+        contract = game.contracts.get(assassin=player)
         target = contract.target.username
-        data = {'type': 'game_start', 'target': target, 'kill_code': player_profile.kill_code}
+        data = {'type': 'game_start', 'target': target, 'num_players': game.players.all().count(), 'kill_code': player_profile.kill_code}
         print "[%s] (%s) %s" % (timezone.now(), player.username, data) 
         gcm.json_request(registration_ids=[player_profile.gcm_regid], data=data)
 
 @task
-def notify_join(gameid, newPlayer): # newplayer is a username
-    from aod.game.models import Game
-    game = Game.objects.get(id=gameid)
+def notify_join(game, newPlayer): # newplayer is a username
     for player in game.players.all():
         if player.username != newPlayer:
             gcmid = player.get_profile().gcm_regid
-            data = {'type': 'player_join', 'name': newPlayer}
+            data = {'type': 'player_join', 'name': newPlayer, 'num_players': game.players.all().count()}
             print "[%s] (%s) %s" % (timezone.now(), player.username, data)
             gcm.json_request(registration_ids=[gcmid], data=data)
 
@@ -66,32 +59,30 @@ def notify_photo(photoid):
     gcm.json_request(registration_ids=[assassin_gcmid], data=data)
 
 @task
-def notify_new_target(contractId):
-    from aod.game.models import Contract
-    contract = Contract.objects.get(id=contractId)
+def notify_new_target(contract):
+    if contract.game.has_ended():
+        end_game.delay(contract.game)
+        return
     assassin_gcmid = contract.assassin.get_profile().gcm_regid
     data = {'type': 'new_target', 'target': contract.target.username}
     print "[%s] (%s) %s" % (timezone.now(), contract.assassin.username, data)
     gcm.json_request(registration_ids=[assassin_gcmid], data=data)
 
 @task
-def notify_killed(game, user):
-    profile = user.get_profile()
-    data = {'type': 'killed', 'victim': user.username}
+def notify_killed(killRecord):
+    data = {'type': 'killed', 'victim': killRecord.victim.username}
     gcm_ids = []
-    for player in game.players.all():
+    for player in killRecord.game.players.all():
         gcm_ids.append(player.get_profile().gcm_regid)
     print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
     gcm.json_request(registration_ids=gcm_ids, data=data)
+    killRecord.game.players.remove(killRecord.victim)
 
 @task
-def end_game(gameId):
-    from aod.game.models import Game
-    game = Game.objects.get(id=gameId)
+def end_game(game):
     gcm_ids = []
-    for player in game.players.all():
-        gcm_ids.append(player.get_profile().gcm_regid)
-    data = {'type': 'game_end', 'winner': game.contracts.all()[0].assassin.username}
+    winner = game.players.all()[0]
+    data = {'type': 'game_end', 'winner': winner.username}
     print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
-    gcm.json_request(registration_ids=gcm_ids, data=data)
+    gcm.json_request(registration_ids=winner.get_profile().gcm_regid, data=data)
 
