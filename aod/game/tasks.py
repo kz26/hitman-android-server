@@ -8,6 +8,7 @@ gcm = GCM(settings.GCM_API_KEY)
 
 @task
 def assign_targets(game):
+    from aod.game.models import Contract
     playerCount = game.players.all().count()
     if playerCount >= 2:
         print "Game %s: Assigning contracts for %s players" % (game.id, playerCount)
@@ -80,9 +81,9 @@ def notify_killed(killRecord):
 
 @task
 def end_game(game):
-    gcm_ids = []
     winner = game.players.all()[0]
+    gcm_ids = [winner.get_profile().gcm_regid]
     data = {'type': 'game_end', 'winner': winner.username}
     print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
-    gcm.json_request(registration_ids=winner.get_profile().gcm_regid, data=data)
+    gcm.json_request(registration_ids=gcm_ids, data=data)
 
