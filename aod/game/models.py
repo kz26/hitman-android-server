@@ -24,7 +24,7 @@ class Game(models.Model):
         return "%s: %s" % (self.id, self.name)
 
     def has_ended(self):
-        return self.players.all().count() <= 1
+        return self.contracts.all().count() <= 1
 
     def save(self, *args, **kwargs):
         firstSave = False
@@ -83,7 +83,7 @@ class KillManager(models.Manager):
         killRecord = self.create(game=contracts[0].game, killer=killer, victim=victim)
         new_contract = toRun()
         tasks.notify_killed.delay(killRecord)
-        tasks.notify_new_target.apply_async([new_contract], countdown=30)
+        tasks.notify_new_target.apply_async([new_contract], countdown=10)
         return True
 
 
