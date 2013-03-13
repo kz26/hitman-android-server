@@ -86,4 +86,5 @@ def end_game(game):
     data = {'type': 'game_end', 'winner': winner.username}
     print "[%s] (%s) %s" % (timezone.now(), str(gcm_ids), data)
     gcm.json_request(registration_ids=gcm_ids, data=data)
+    game.players.clear()
 
